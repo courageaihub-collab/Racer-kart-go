@@ -2,8 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Desk Racer</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0a0c12" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Desk Racer - 16:9 Mobile</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -13,269 +19,1100 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <!-- 3D WebGL Canvas Mount -->
-    <div id="canvas-container"></div>
+    <!-- Mobile App Root Stage: Centers and Scales 16:9 Mobile App Viewport -->
+    <div id="mobile-app-root">
+      <!-- Ambient Studio Glow behind the 16:9 Shell on wide displays -->
+      <div id="mobile-ambient-stage" aria-hidden="true"></div>
 
-    <!-- Helmet Visor Overlay (Visible in Camera 2: Helmet Visor POV — Clean, no top chip) -->
-    <div id="helmet-visor-overlay" class="hidden">
-      <div class="visor-vignette"></div>
-    </div>
-
-    <!-- Subtle Corner Vignette Behind HUD Elements (Visible in Camera Views 1 & 2) -->
-    <div id="hud-corner-vignette"></div>
-
-    <!-- Streamlined HUD Overlay -->
-    <div id="hud-root">
-      <!-- Top Row: Clickable "Desk Racer" Title (Top-Left) & Lap Counter/Timer + Mute Icon (Top-Right) -->
-      <header class="hud-top-bar">
-        <div class="hud-top-left-stack">
-          <div
-            id="hud-brand-logo"
-            class="hud-brand-title"
-            role="button"
-            tabindex="0"
-            title="Click to open Controls &amp; Camera Menu"
-          >Desk Racer</div>
-        </div>
-
-        <div class="hud-settings-anchor">
-          <div class="hud-top-right-row">
-            <!-- Top-Right Lap Counter & Lap Timer (Visible in 1P & 2P Views) -->
-            <div id="hud-lap-widget" class="hud-lap-widget">
-              <div id="hud-lap-header" class="hud-lap-header">
-                LAP <span id="hud-lap-curr" class="hud-lap-curr">1</span>/3
-              </div>
-              <div id="hud-lap-timer" class="hud-lap-timer" aria-label="00:00.00"><span class="timer-digit" id="lap-d0">0</span><span class="timer-digit" id="lap-d1">0</span><span class="timer-sep">:</span><span class="timer-digit" id="lap-d2">0</span><span class="timer-digit" id="lap-d3">0</span><span class="timer-sep">.</span><span class="timer-digit" id="lap-d4">0</span><span class="timer-digit" id="lap-d5">0</span></div>
-              <div id="hud-lap-split" class="hud-lap-split hidden"></div>
-            </div>
-
-            <!-- Top-Right Mute / Unmute Sound Icon Button -->
-            <button
-              id="btn-mute-sound"
-              class="hud-mute-btn is-muted"
-              type="button"
-              aria-label="Toggle Sound (M)"
-              title="Toggle Sound (M)"
-            >
-              <!-- Speaker Unmuted Icon -->
-              <svg id="icon-sound-on" class="mute-svg hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-              </svg>
-              <!-- Speaker Muted Icon -->
-              <svg id="icon-sound-off" class="mute-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                <line x1="23" y1="9" x2="17" y2="15"></line>
-                <line x1="17" y1="9" x2="23" y2="15"></line>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <!-- Welcome & Controls Dialog (Shown on Launch & When Clicking "Desk Racer") -->
-      <div id="welcome-dialog-overlay" class="welcome-dialog-overlay">
-        <div class="welcome-dialog-card" role="dialog" aria-labelledby="welcome-title">
-          <div class="welcome-eyebrow">DESKTOP CIRCUIT · 3 LAPS</div>
-          <h1 id="welcome-title" class="welcome-title">DESK RACER</h1>
-
-          <div class="welcome-controls-grid">
-            <!-- WASD Controls -->
-            <div class="welcome-control-block">
-              <div class="welcome-control-label">CONTROLS</div>
-              <div class="control-keys-list" aria-label="WASD Controls">
-                <div class="control-key-row">
-                  <div class="control-kbd-pair">
-                    <kbd class="welcome-key">W</kbd>
-                  </div>
-                  <span>ACCELERATE</span>
-                </div>
-                <div class="control-key-row">
-                  <div class="control-kbd-pair">
-                    <kbd class="welcome-key">A</kbd>
-                    <kbd class="welcome-key">D</kbd>
-                  </div>
-                  <span>STEER</span>
-                </div>
-                <div class="control-key-row">
-                  <div class="control-kbd-pair">
-                    <kbd class="welcome-key">S</kbd>
-                  </div>
-                  <span>BRAKE</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Game Views 1-4 -->
-            <div class="welcome-control-block">
-              <div class="welcome-control-label">GAME VIEWS</div>
-              <div class="cam-keys-list">
-                <div class="cam-key-row cam-pill active" data-cam="1"><kbd class="welcome-key welcome-key-cyan">1</kbd><span>CHASE VIEW</span></div>
-                <div class="cam-key-row cam-pill" data-cam="2"><kbd class="welcome-key welcome-key-cyan">2</kbd><span>COCKPIT</span></div>
-                <div class="cam-key-row cam-pill" data-cam="3"><kbd class="welcome-key welcome-key-cyan">3</kbd><span>FULL DESK VIEW</span></div>
-                <div class="cam-key-row cam-pill" data-cam="4"><kbd class="welcome-key welcome-key-cyan">4</kbd><span>DRONE VIEW</span></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="welcome-footer-row">
-            <button id="btn-welcome-start" class="welcome-start-btn" type="button">
-              <span id="welcome-start-text" class="welcome-start-text">START TIME TRIAL</span>
-              <kbd id="welcome-enter-kbd" class="welcome-enter-kbd">ENTER ↵</kbd>
-              <span class="welcome-btn-progress-track" aria-hidden="true">
-                <span id="welcome-btn-progress-fill" class="welcome-btn-progress-fill"></span>
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Center Formula 1 Countdown Number (Triggered by pressing Enter at Start) -->
-      <div id="hud-f1-countdown" class="hud-f1-countdown hidden">5</div>
-
-      <div id="hud-finish-overlay" class="welcome-dialog-overlay hud-finish-overlay hidden" role="dialog" aria-labelledby="hud-finish-title">
-        <div class="welcome-dialog-card finish-dialog-card">
-          <div class="welcome-eyebrow">DESKTOP CIRCUIT · 3 LAPS COMPLETE</div>
-          <h2 id="hud-finish-title" class="hud-finish-title">FINISH</h2>
-          <div id="hud-finish-time" class="hud-finish-time">00:00.00</div>
-          <div id="hud-finish-sub" class="hud-finish-sub">BEST LAP 00:00.00</div>
-          <div class="finish-actions-row">
-            <button id="btn-finish-race-again" class="welcome-start-btn finish-action-btn" type="button">
-              <span class="welcome-start-text">RACE AGAIN</span>
-              <kbd class="welcome-enter-kbd">ENTER ↵</kbd>
-            </button>
-            <button id="btn-finish-autopilot" class="welcome-start-btn finish-action-btn finish-autopilot-btn" type="button">
-              <span class="welcome-start-text">AUTO-PILOT</span>
-              <kbd class="welcome-enter-kbd">P</kbd>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Bottom Row: 3D Tilted Racetrack Minimap (Bottom-Left) | Angled Segmented Speedometer HUD (Bottom-Right) -->
-      <footer class="hud-bottom-bar">
-        <!-- Bottom-Left: Borderless Horizontally-Tilted 3D Racetrack Outline & Cyan Glowing Dot -->
-        <div class="hud-minimap-widget" title="Live Racetrack Position">
-          <canvas id="minimap-canvas" width="600" height="390"></canvas>
-        </div>
-
-        <!-- Bottom-Right: Sleek Angled Segmented Speed Bar + Italic KM/H & Speed Readout -->
-        <div class="hud-speedo-gauge">
-          <svg id="speedo-gauge-svg" viewBox="0 0 284 134" class="speedo-svg">
-            <defs>
-              <linearGradient id="speedoFrameStrokeGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-                <stop offset="0%" stop-color="rgba(255, 255, 255, 0.35)" />
-                <stop offset="45%" stop-color="rgba(160, 240, 255, 0.55)" />
-                <stop offset="100%" stop-color="rgba(0, 232, 255, 0.92)" />
-              </linearGradient>
-              <filter id="speedoCyanGlow" x="-25%" y="-25%" width="150%" height="150%">
-                <feGaussianBlur stdDeviation="2.4" result="blur" />
-                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-              </filter>
-            </defs>
-
-            <!-- Outer dark angled bar casing & cyan-accented frame -->
-            <polygon
-              id="speedo-bar-casing"
-              points="15,108 62,34 268,6 276,22 73,50 28,118"
-              class="speedo-bar-casing"
-              stroke="url(#speedoFrameStrokeGrad)"
-            />
-
-            <!-- 18 angled parallelogram speed segments populated dynamically at startup -->
-            <g id="speedo-ticks-group"></g>
+      <!-- Orientation Advisory Banner (shown only on portrait phones) -->
+      <aside id="mobile-rotate-advisory" class="mobile-rotate-advisory hidden" aria-label="Orientation suggestion">
+        <div class="rotate-advisory-inner">
+          <svg class="rotate-phone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="2" width="16" height="20" rx="3" ry="3"></rect>
+            <path d="M10 18h4"></path>
           </svg>
+          <span class="rotate-advisory-text">Rotate device to <strong>Landscape</strong> for optimal 16:9 racing</span>
+          <button id="btn-dismiss-rotate" class="rotate-dismiss-btn" type="button" aria-label="Dismiss">&times;</button>
+        </div>
+      </aside>
 
-          <!-- Italic KM/H label & Large Bold Italic Speed Readout tucked inside the angled bar -->
-          <div class="speedo-readout-group">
-            <div class="speedo-unit-label">KM/H</div>
-            <div id="hud-scale-speed" class="speedo-digits">0</div>
+      <!-- 16:9 Mobile Device Shell (supports phone bezel frame or edge-to-edge 16:9) -->
+      <main id="mobile-device-shell" class="phone-frame-active">
+        <!-- Phone Hardware Bezel Elements (Visible in Phone Frame Mode) -->
+        <div class="phone-bezel-rim" aria-hidden="true">
+          <div class="phone-island-notch">
+            <span class="phone-lens-dot"></span>
+            <span class="phone-speaker-slit"></span>
+          </div>
+          <div class="phone-side-key phone-key-vol-up"></div>
+          <div class="phone-side-key phone-key-vol-down"></div>
+          <div class="phone-side-key phone-key-power"></div>
+        </div>
+
+        <!-- 16:9 Game Screen Container (Holds 3D Canvas, Overlays, and Mobile HUD) -->
+        <div id="mobile-screen-viewport">
+          <!-- 3D WebGL Canvas Mount -->
+          <div id="canvas-container"></div>
+
+          <!-- Helmet Visor Overlay (Visible in Camera 2: Helmet Visor POV) -->
+          <div id="helmet-visor-overlay" class="hidden">
+            <div class="visor-vignette"></div>
+          </div>
+
+          <!-- Corner Vignette Behind HUD Elements -->
+          <div id="hud-corner-vignette"></div>
+
+          <!-- Streamlined Mobile 16:9 HUD Overlay -->
+          <div id="hud-root">
+            <!-- Top Bar: Left (Brand, Cam, Autopilot) | Right (Lap, Timer, Sound, Frame, Settings) -->
+            <header class="hud-top-bar">
+              <div class="hud-top-left-stack">
+                <div class="hud-brand-row">
+                  <div
+                    id="hud-brand-logo"
+                    class="hud-brand-title"
+                    role="button"
+                    tabindex="0"
+                    title="Click to open Controls &amp; Settings"
+                  >DESK RACER</div>
+                  <span class="hud-mobile-badge" title="Running in 16:9 Mobile Landscape Mode">16:9 MOBILE</span>
+                </div>
+
+                <!-- Quick Mobile Control Pills -->
+                <div class="hud-quick-pills-row">
+                  <button id="btn-quick-cam" class="hud-quick-pill" type="button" title="Cycle Camera Mode (1-4)">
+                    <span class="quick-pill-icon">📷</span>
+                    <span id="txt-quick-cam">CHASE</span>
+                  </button>
+                  <button id="btn-quick-autopilot" class="hud-quick-pill" type="button" title="Toggle Coaster Cruise (P)">
+                    <span class="quick-pill-icon">⚡</span>
+                    <span id="txt-quick-autopilot">CRUISE: OFF</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Center Endless Survival Telemetry Widget (Visible in Endless Mode) -->
+              <div id="hud-endless-widget" class="hud-endless-widget hidden">
+                <div class="endless-pill">
+                  <span class="endless-label">SCORE</span>
+                  <span id="endless-score-val" class="endless-value">0</span>
+                </div>
+                <div class="endless-pill">
+                  <span class="endless-label">TIME</span>
+                  <span id="endless-timer-val" class="endless-value endless-time-warn">35s</span>
+                </div>
+                <div class="endless-pill">
+                  <span class="endless-label">DIST</span>
+                  <span id="endless-dist-val" class="endless-value">0.00 km</span>
+                </div>
+                <div class="endless-pill">
+                  <span class="endless-label">COMBO</span>
+                  <span id="endless-combo-val" class="endless-value endless-combo-text">1.0x</span>
+                </div>
+              </div>
+
+              <div class="hud-settings-anchor">
+                <div class="hud-top-right-row">
+                  <!-- Lap Counter & Lap Timer -->
+                  <div id="hud-lap-widget" class="hud-lap-widget">
+                    <div id="hud-lap-header" class="hud-lap-header">
+                      LAP <span id="hud-lap-curr" class="hud-lap-curr">1</span>/3
+                    </div>
+                    <div id="hud-lap-timer" class="hud-lap-timer" aria-label="00:00.00">
+                      <span class="timer-digit" id="lap-d0">0</span><span class="timer-digit" id="lap-d1">0</span><span class="timer-sep">:</span><span class="timer-digit" id="lap-d2">0</span><span class="timer-digit" id="lap-d3">0</span><span class="timer-sep">.</span><span class="timer-digit" id="lap-d4">0</span><span class="timer-digit" id="lap-d5">0</span>
+                    </div>
+                    <div id="hud-lap-split" class="hud-lap-split hidden"></div>
+                  </div>
+
+                    <!-- Garage, Characters, Cars & Levels Button -->
+                    <button
+                      id="btn-open-garage"
+                      class="hud-mute-btn hud-garage-btn"
+                      type="button"
+                      aria-label="Garage, Characters &amp; Tracks"
+                      title="Select Characters, Theme Cars &amp; Levels"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                        <polyline points="2 17 12 22 22 17"></polyline>
+                        <polyline points="2 12 12 17 22 12"></polyline>
+                      </svg>
+                    </button>
+
+                    <!-- Online Multiplayer Lobby Button -->
+                    <button
+                      id="btn-open-multiplayer"
+                      class="hud-mute-btn hud-multiplayer-btn"
+                      type="button"
+                      aria-label="Online Multiplayer"
+                      title="Online Multiplayer Racing"
+                    >
+                      <span class="btn-status-dot" id="mp-status-dot"></span>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                      </svg>
+                    </button>
+
+                    <!-- Bluetooth Controller & BLE Button -->
+                    <button
+                      id="btn-open-bluetooth"
+                      class="hud-mute-btn hud-bluetooth-btn"
+                      type="button"
+                      aria-label="Bluetooth Controller &amp; Sensors"
+                      title="Connect Bluetooth Controller / Wheel"
+                    >
+                      <span class="btn-status-dot" id="bt-status-dot"></span>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+                      </svg>
+                    </button>
+
+                    <!-- Sound Mute/Unmute -->
+                    <button
+                      id="btn-mute-sound"
+                      class="hud-mute-btn is-muted"
+                      type="button"
+                      aria-label="Toggle Sound (M)"
+                      title="Toggle Sound (M)"
+                    >
+                      <svg id="icon-sound-on" class="mute-svg hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                      </svg>
+                      <svg id="icon-sound-off" class="mute-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <line x1="23" y1="9" x2="17" y2="15"></line>
+                        <line x1="17" y1="9" x2="23" y2="15"></line>
+                      </svg>
+                    </button>
+
+                    <!-- Toggle Phone Frame -->
+                    <button
+                      id="btn-toggle-frame"
+                      class="hud-mute-btn active"
+                      type="button"
+                      aria-label="Toggle Phone Frame Bezel"
+                      title="Toggle Phone Frame Bezel"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="5" y="2" width="14" height="20" rx="3" ry="3"></rect>
+                        <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                      </svg>
+                    </button>
+
+                    <!-- Controls / Menu -->
+                    <button
+                      id="btn-open-help"
+                      class="hud-mute-btn"
+                      type="button"
+                      aria-label="Open Controls Menu"
+                      title="Open Controls Menu"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </header>
+
+            <!-- Full-Screen AAA 3D Racing Game Main Menu Overlay -->
+            <div id="welcome-dialog-overlay" class="welcome-dialog-overlay game-fullscreen-menu" role="dialog" aria-labelledby="menu-player-name">
+              <div class="main-menu-hud-root">
+                
+                <!-- 1. TOP NAVIGATION HUD BAR -->
+                <header class="menu-top-hud">
+                  <!-- Left: Player Profile & Avatar -->
+                  <div class="menu-profile-pill" id="btn-open-profile" role="button" tabindex="0" title="Open Player Profile">
+                    <div class="profile-avatar-ring">
+                      <span id="sc-driver-avatar-mini" class="profile-avatar-emoji">🔥</span>
+                      <span class="profile-lvl-badge" id="hud-player-lvl">LVL 12</span>
+                    </div>
+                    <div class="profile-text-block">
+                      <div class="profile-username-row">
+                        <span id="menu-player-name" class="profile-username">DESK RACER PRO</span>
+                        <span class="profile-vip-chip">VIP PRO</span>
+                      </div>
+                      <div class="profile-xp-track">
+                        <div id="hud-xp-fill" class="profile-xp-fill" style="width: 74%"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Center: Notifications Bell -->
+                  <div class="menu-top-center">
+                    <button id="btn-menu-notifications" class="hud-circle-icon-btn" type="button" title="Notifications">
+                      <span class="hud-badge-dot">3</span>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                      </svg>
+                    </button>
+                  </div>
+
+                  <!-- Right: Currencies & Settings -->
+                  <div class="menu-currencies-row">
+                    <!-- Gold Coins Counter -->
+                    <div class="currency-pill coin-pill" id="btn-open-shop-coins" role="button" tabindex="0" title="Get More Coins">
+                      <span class="currency-icon">🪙</span>
+                      <span id="hud-coins-val" class="currency-value">125,400</span>
+                      <span class="currency-add-btn">+</span>
+                    </div>
+
+                    <!-- Nitro Gems Counter -->
+                    <div class="currency-pill gem-pill" id="btn-open-shop-gems" role="button" tabindex="0" title="Get More Gems">
+                      <span class="currency-icon">💎</span>
+                      <span id="hud-gems-val" class="currency-value">1,250</span>
+                      <span class="currency-add-btn">+</span>
+                    </div>
+
+                    <!-- Settings Button -->
+                    <button id="btn-open-settings" class="hud-circle-icon-btn" type="button" title="Game Settings">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </header>
+
+                <!-- 2. MAIN 3D CAR SHOWCASE INTERACTIVE OVERLAY -->
+                <div class="menu-car-centerpiece">
+                  <!-- Vehicle Switcher Arrow Left -->
+                  <button id="btn-car-prev" class="car-nav-arrow arrow-left" type="button" title="Previous Vehicle (◀)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                  </button>
+
+                  <!-- Vehicle Switcher Arrow Right -->
+                  <button id="btn-car-next" class="car-nav-arrow arrow-right" type="button" title="Next Vehicle (▶)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                  </button>
+
+                  <!-- Floating Vehicle Specs Card (Top-Left) -->
+                  <div class="car-info-glass-panel">
+                    <div class="car-title-block">
+                      <div class="car-class-badge" id="sc-car-class">S-CLASS · PP 780</div>
+                      <h2 id="sc-car-name" class="car-display-name">INFERNO CYBER-KART</h2>
+                      <div id="sc-car-theme" class="car-theme-sub">Candy Red Cyber Aero</div>
+                    </div>
+
+                    <!-- Performance Stats Indicators -->
+                    <div class="car-perf-meters">
+                      <div class="perf-row">
+                        <span class="perf-label">TOP SPEED</span>
+                        <div class="perf-bar-track"><div id="sc-car-stat-speed" class="perf-fill fill-cyan" style="width: 94%"></div></div>
+                      </div>
+                      <div class="perf-row">
+                        <span class="perf-label">ACCELERATION</span>
+                        <div class="perf-bar-track"><div id="sc-car-stat-accel" class="perf-fill fill-amber" style="width: 92%"></div></div>
+                      </div>
+                      <div class="perf-row">
+                        <span class="perf-label">HANDLING</span>
+                        <div class="perf-bar-track"><div id="sc-car-stat-drift" class="perf-fill fill-green" style="width: 86%"></div></div>
+                      </div>
+                      <div class="perf-row">
+                        <span class="perf-label">NITRO BOOST</span>
+                        <div class="perf-bar-track"><div id="sc-car-stat-boost" class="perf-fill fill-purple" style="width: 96%"></div></div>
+                      </div>
+                    </div>
+
+                    <!-- Car Feature Chips -->
+                    <div id="sc-car-features" class="car-feature-tags">
+                      <span class="car-feature-chip">Dual Ice-Blue LED Splitters</span>
+                      <span class="car-feature-chip">Chrome Turbos</span>
+                    </div>
+
+                    <div class="drag-hint-pill">
+                      <span>👆 DRAG TO ROTATE 3D CAR</span>
+                    </div>
+                  </div>
+
+                  <!-- 3D Pedestal Floor Glow Anchor -->
+                  <div id="sc-car-pedestal-glow" class="car-showroom-floor-glow"></div>
+                </div>
+
+                <!-- 3. MAIN MENU BUTTONS & PLAY CTA -->
+                <div class="menu-action-hub">
+                  <!-- Secondary Quick Action Buttons Stack (Right Side) -->
+                  <div class="menu-side-actions">
+                    <button id="btn-menu-garage" class="menu-side-btn" type="button">
+                      <span class="side-btn-icon">🎨</span>
+                      <span class="side-btn-text">GARAGE</span>
+                    </button>
+                    <button id="btn-menu-career" class="menu-side-btn" type="button">
+                      <span class="side-btn-icon">🏁</span>
+                      <span class="side-btn-text">CAREER</span>
+                    </button>
+                    <button id="btn-menu-multiplayer" class="menu-side-btn" type="button">
+                      <span class="side-btn-icon">🌐</span>
+                      <span class="side-btn-text">ONLINE</span>
+                    </button>
+                    <button id="btn-menu-shop" class="menu-side-btn" type="button">
+                      <span class="side-btn-icon">🛒</span>
+                      <span class="side-btn-text">SHOP</span>
+                    </button>
+                    <button id="btn-menu-inventory" class="menu-side-btn" type="button">
+                      <span class="side-btn-icon">🎒</span>
+                      <span class="side-btn-text">INVENTORY</span>
+                    </button>
+                  </div>
+
+                  <!-- PRIMARY ACTION BUTTON: PLAY -->
+                  <div class="menu-play-cta-wrapper">
+                    <button id="btn-menu-play" class="primary-play-btn" type="button">
+                      <span class="play-btn-glow"></span>
+                      <span class="play-btn-content">
+                        <span class="play-btn-text">PLAY</span>
+                        <span class="play-btn-icon">🏁</span>
+                      </span>
+                    </button>
+
+                    <!-- Hidden compatibility fallbacks -->
+                    <button id="btn-start-level-1" class="hidden" type="button"></button>
+                    <button id="btn-continue-career" class="hidden" type="button"></button>
+                    <button id="btn-welcome-start" class="hidden" type="button">
+                      <span id="welcome-start-text">START</span>
+                      <kbd id="welcome-enter-kbd">ENTER</kbd>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 4. BOTTOM NAVIGATION BAR -->
+                <footer class="menu-bottom-nav">
+                  <button class="nav-tab-btn active" data-tab="home" type="button">
+                    <span class="tab-icon">🏠</span>
+                    <span class="tab-label">HOME</span>
+                  </button>
+                  <button class="nav-tab-btn" data-tab="garage" type="button">
+                    <span class="tab-icon">🏎️</span>
+                    <span class="tab-label">GARAGE</span>
+                  </button>
+                  <button class="nav-tab-btn" data-tab="career" type="button">
+                    <span class="tab-icon">🏆</span>
+                    <span class="tab-label">CAREER</span>
+                  </button>
+                  <button class="nav-tab-btn" data-tab="multiplayer" type="button">
+                    <span class="tab-icon">🌐</span>
+                    <span class="tab-label">ONLINE</span>
+                  </button>
+                  <button class="nav-tab-btn" data-tab="shop" type="button">
+                    <span class="tab-icon">🛒</span>
+                    <span class="tab-label">SHOP</span>
+                  </button>
+                  <button class="nav-tab-btn" data-tab="profile" type="button">
+                    <span class="tab-icon">👤</span>
+                    <span class="tab-label">PROFILE</span>
+                  </button>
+                </footer>
+
+              </div>
+            </div>
+
+            <!-- Garage & Level Select Dialog (Characters, Theme Cars, Tracks, Modes) -->
+            <div id="garage-dialog-overlay" class="welcome-dialog-overlay hidden" role="dialog" aria-labelledby="garage-title">
+              <div class="welcome-dialog-card garage-dialog-card">
+                <button id="btn-close-garage" class="dialog-close-btn" type="button" aria-label="Close">&times;</button>
+                <div class="welcome-eyebrow">CUSTOM VEHICLE, CHARACTER &amp; TRACK SELECTOR</div>
+                <h2 id="garage-title" class="welcome-title">GARAGE &amp; TRACKS</h2>
+
+                <!-- Tabs: Racers, Cars, Levels, Modes -->
+                <div class="garage-tabs-row" role="tablist">
+                  <button class="garage-tab-btn active" type="button" data-tab="racers">1. RACER CHARACTERS</button>
+                  <button class="garage-tab-btn" type="button" data-tab="cars">2. THEME CARS</button>
+                  <button class="garage-tab-btn" type="button" data-tab="levels">3. RACE TRACKS</button>
+                  <button class="garage-tab-btn" type="button" data-tab="modes">4. GAME MODE</button>
+                </div>
+
+                <!-- Tab 1: Characters -->
+                <div id="tab-pane-racers" class="garage-tab-pane active">
+                  <div class="garage-cards-grid">
+                    <!-- Blaze (Route 77) -->
+                    <div class="selection-card active" data-char="blaze">
+                      <div class="sel-card-header">
+                        <span class="sel-card-badge sel-badge-fire">ROUTE 77</span>
+                        <span class="sel-card-name">BLAZE</span>
+                      </div>
+                      <div class="sel-card-sub">Blue &amp; Red Flame Helmet · Fire Suit</div>
+                      <div class="sel-perk-tag">🔥 Inferno Boost (+15% Turbo)</div>
+                      <p class="sel-card-desc">Fearless speed demon with high-velocity afterburners and aggressive corner exits.</p>
+                    </div>
+
+                    <!-- Neo (Eagle Drift Ace) -->
+                    <div class="selection-card" data-char="neo">
+                      <div class="sel-card-header">
+                        <span class="sel-card-badge sel-badge-green">EAGLE NEO</span>
+                        <span class="sel-card-name">NEO</span>
+                      </div>
+                      <div class="sel-card-sub">Lime &amp; Blue Winged Aero Helmet · Flight Suit</div>
+                      <div class="sel-perk-tag">🦅 Aero Glide (+20% Drift Grip)</div>
+                      <p class="sel-card-desc">Master of high-speed banked coaster corkscrews and precision tire slides.</p>
+                    </div>
+
+                    <!-- Viper (Scuderia Master) -->
+                    <div class="selection-card" data-char="viper">
+                      <div class="sel-card-header">
+                        <span class="sel-card-badge sel-badge-red">SCUDERIA</span>
+                        <span class="sel-card-name">VIPER</span>
+                      </div>
+                      <div class="sel-card-sub">Carbon &amp; Crimson Helmet · Gold Visor</div>
+                      <div class="sel-perk-tag">⚡ Apex Velocity (+10% Top Speed)</div>
+                      <p class="sel-card-desc">World championship kart racer tuned for blistering straightaway speed.</p>
+                    </div>
+
+                    <!-- Luna (Cyber Nitro Pilot) -->
+                    <div class="selection-card" data-char="luna">
+                      <div class="sel-card-header">
+                        <span class="sel-card-badge sel-badge-cyan">CYBER-X</span>
+                        <span class="sel-card-name">LUNA</span>
+                      </div>
+                      <div class="sel-card-sub">Cyan Holographic Visor · Titanium Violet Gear</div>
+                      <div class="sel-perk-tag">🔋 Overdrive (+25% Boost Duration)</div>
+                      <p class="sel-card-desc">Futuristic arena pilot equipped with an overclocked kinetic boost cell.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Tab 2: Theme Cars -->
+                <div id="tab-pane-cars" class="garage-tab-pane">
+                  <div class="garage-cards-grid">
+                    <!-- Inferno Cyber-Kart -->
+                    <div class="selection-card active" data-car="inferno">
+                      <div class="sel-card-header">
+                        <span class="sel-card-badge sel-badge-red">CYBER AERO</span>
+                        <span class="sel-card-name">INFERNO</span>
+                      </div>
+                      <div class="sel-card-sub">Candy Red · Dual Ice-Blue Headlights · Chrome Turbos</div>
+                      <div class="car-stat-row">
+                        <span>SPEED: 92</span>
+                        <span>ACCEL: 90</span>
+                        <span>DRIFT: 86</span>
+                        <span>BOOST: 96</span>
+                      </div>
+                    </div>
+
+                    <!-- Wildfire #26 -->
+                    <div class="selection-card" data-car="wildfire">
+                      <div class="sel-card-header">
+                        <span class="sel-card-badge sel-badge-orange">SPRINT KART</span>
+                        <span class="sel-card-name">WILDFIRE #26</span>
+                      </div>
+                      <div class="sel-card-sub">Gloss Black &amp; Flames · Roll Cage · #26 Pods</div>
+                      <div class="car-stat-row">
+                        <span>SPEED: 88</span>
+                        <span>ACCEL: 96</span>
+                        <span>DRIFT: 84</span>
+                        <span>BOOST: 90</span>
+                      </div>
+                    </div>
+
+                    <!-- Aero Drift Blue -->
+                    <div class="selection-card" data-car="aerodrift">
+                      <div class="sel-card-header">
+                        <span class="sel-card-badge sel-badge-cyan">SPACEFRAME</span>
+                        <span class="sel-card-name">AERO DRIFT BLUE</span>
+                      </div>
+                      <div class="sel-card-sub">Sky Blue Tubular Frame · Twin-Strut High GT Wing</div>
+                      <div class="car-stat-row">
+                        <span>SPEED: 85</span>
+                        <span>ACCEL: 88</span>
+                        <span>DRIFT: 98</span>
+                        <span>BOOST: 84</span>
+                      </div>
+                    </div>
+
+                    <!-- Scuderia Rosso F1 -->
+                    <div class="selection-card" data-car="scuderia">
+                      <div class="sel-card-header">
+                        <span class="sel-card-badge sel-badge-red">FORMULA GP</span>
+                        <span class="sel-card-name">SCUDERIA ROSSO</span>
+                      </div>
+                      <div class="sel-card-sub">Scuderia Crimson · Front Aero Wing · Lettered Slicks</div>
+                      <div class="car-stat-row">
+                        <span>SPEED: 98</span>
+                        <span>ACCEL: 92</span>
+                        <span>DRIFT: 88</span>
+                        <span>BOOST: 88</span>
+                      </div>
+                    </div>
+
+                    <!-- Gokart PRO Giallo -->
+                    <div class="selection-card" data-car="gokartpro">
+                      <div class="sel-card-header">
+                        <span class="sel-card-badge sel-badge-gold">SUPERKART</span>
+                        <span class="sel-card-name">GOKART PRO GIALLO</span>
+                      </div>
+                      <div class="sel-card-sub">Lamborghini Giallo Yellow · Supercar Fairing</div>
+                      <div class="car-stat-row">
+                        <span>SPEED: 90</span>
+                        <span>ACCEL: 92</span>
+                        <span>DRIFT: 92</span>
+                        <span>BOOST: 90</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Tab 3: Levels / Race Tracks -->
+                <div id="tab-pane-levels" class="garage-tab-pane">
+                  <div class="garage-cards-grid">
+                    <!-- Desktop Circuit -->
+                    <div class="selection-card active" data-level="desktop">
+                      <div class="sel-card-header">
+                        <span class="sel-card-badge sel-badge-gold">SIGNATURE</span>
+                        <span class="sel-card-name">DESKTOP CIRCUIT</span>
+                      </div>
+                      <div class="sel-card-sub">Warm Evening Lamps · Laptop Stand Climb · Cat Helix</div>
+                      <p class="sel-card-desc">The iconic miniature rollercoaster circuit looping around high-tech desk monuments.</p>
+                    </div>
+
+                    <!-- TAK Nitro Dome -->
+                    <div class="selection-card" data-level="nitrodome">
+                      <div class="sel-card-header">
+                        <span class="sel-card-badge sel-badge-purple">NIGHT ARENA</span>
+                        <span class="sel-card-name">TAK NITRO DOME</span>
+                      </div>
+                      <div class="sel-card-sub">Pulsing Neon Violet &amp; Cyan · Flame Torches · Mega Displays</div>
+                      <p class="sel-card-desc">Futuristic indoor stadium arena with elevated banked curves and crowd atmosphere.</p>
+                    </div>
+
+                    <!-- Grand Prix Park -->
+                    <div class="selection-card" data-level="grandprix">
+                      <div class="sel-card-header">
+                        <span class="sel-card-badge sel-badge-green">OUTDOOR GP</span>
+                        <span class="sel-card-name">GRAND PRIX PARK</span>
+                      </div>
+                      <div class="sel-card-sub">Lush Green Grass · Red-and-White FIA Curbs · Sunny Sky</div>
+                      <p class="sel-card-desc">Professional outdoor go-kart championship facility with pine tree infields.</p>
+                    </div>
+
+                    <!-- Festival Arena Oval -->
+                    <div class="selection-card" data-level="festival">
+                      <div class="sel-card-header">
+                        <span class="sel-card-badge sel-badge-orange">SUPER SPEEDWAY</span>
+                        <span class="sel-card-name">FESTIVAL ARENA</span>
+                      </div>
+                      <div class="sel-card-sub">Festival Canopies · Hot Air Balloons · High-Banked Oval</div>
+                      <p class="sel-card-desc">Supersonic festival racetrack packed with colorful pavilions and spectator grandstands.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Tab 4: Game Modes -->
+                <div id="tab-pane-modes" class="garage-tab-pane">
+                  <div class="garage-cards-grid">
+                    <!-- 3-Lap Cup -->
+                    <div class="selection-card active" data-mode="cup">
+                      <div class="sel-card-header">
+                        <span class="sel-card-badge sel-badge-gold">CHAMPIONSHIP</span>
+                        <span class="sel-card-name">3-LAP CUP RACE</span>
+                      </div>
+                      <div class="sel-card-sub">Classic Time Trial · Sector Split Tracking · Finish Podium</div>
+                      <p class="sel-card-desc">Race against the clock or challenge friends in online multiplayer across 3 competitive laps.</p>
+                    </div>
+
+                    <!-- Offline Endless Survival -->
+                    <div class="selection-card" data-mode="endless">
+                      <div class="sel-card-header">
+                        <span class="sel-card-badge sel-badge-cyan">100% OFFLINE</span>
+                        <span class="sel-card-name">ENDLESS SURVIVAL</span>
+                      </div>
+                      <div class="sel-card-sub">No Lap Limits · Checkpoint Countdown · Drift Multipliers</div>
+                      <p class="sel-card-desc">Play offline anywhere! Survive against the ticking checkpoint clock, accumulate massive drift combos, and set record distance milestones.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="garage-footer-row">
+                  <button id="btn-apply-garage" class="welcome-start-btn" type="button">
+                    <span class="welcome-start-text">APPLY SELECTION &amp; RACE</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Online Multiplayer Racing Dialog -->
+            <div id="multiplayer-dialog-overlay" class="welcome-dialog-overlay hidden" role="dialog" aria-labelledby="mp-title">
+              <div class="welcome-dialog-card mp-dialog-card">
+                <button id="btn-close-mp" class="dialog-close-btn" type="button" aria-label="Close">&times;</button>
+                <div class="welcome-eyebrow">CROSS-DEVICE REALTIME MULTIPLAYER</div>
+                <h2 id="mp-title" class="welcome-title">ONLINE RACING</h2>
+
+                <div class="mp-setup-grid">
+                  <!-- Name & Room Inputs -->
+                  <div class="mp-input-group">
+                    <label class="mp-input-label" for="mp-player-name">YOUR RACER NAME</label>
+                    <input id="mp-player-name" class="mp-text-input" type="text" maxlength="15" value="Desk Pilot" placeholder="Enter name" />
+                  </div>
+
+                  <div class="mp-input-group">
+                    <label class="mp-input-label" for="mp-room-code">ROOM CODE (ANY DEVICE)</label>
+                    <div class="mp-room-input-row">
+                      <input id="mp-room-code" class="mp-text-input mp-code-input" type="text" maxlength="12" value="DESK-1" placeholder="ROOM-CODE" />
+                      <button id="btn-mp-quick" class="mp-small-btn" type="button" title="Generate Random Room">RANDOM</button>
+                    </div>
+                  </div>
+
+                  <!-- Kart Paint Color Picker -->
+                  <div class="mp-input-group mp-full-width">
+                    <label class="mp-input-label">KART BODY &amp; VISOR COLOR</label>
+                    <div id="mp-color-picker" class="mp-color-swatches">
+                      <button class="mp-swatch active" type="button" data-color="#00e5ff" style="--swatch-color: #00e5ff;" title="Cyan Neon"></button>
+                      <button class="mp-swatch" type="button" data-color="#ffaa44" style="--swatch-color: #ffaa44;" title="Gold Rush"></button>
+                      <button class="mp-swatch" type="button" data-color="#ff3b30" style="--swatch-color: #ff3b30;" title="Racing Crimson"></button>
+                      <button class="mp-swatch" type="button" data-color="#32d74b" style="--swatch-color: #32d74b;" title="Acid Emerald"></button>
+                      <button class="mp-swatch" type="button" data-color="#b537f2" style="--swatch-color: #b537f2;" title="Cosmic Purple"></button>
+                      <button class="mp-swatch" type="button" data-color="#ffffff" style="--swatch-color: #ffffff;" title="Titanium White"></button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mp-actions-row">
+                  <button id="btn-mp-join" class="welcome-start-btn mp-action-btn" type="button">
+                    <span class="welcome-start-text">CONNECT TO LOBBY</span>
+                  </button>
+                </div>
+
+                <!-- Live Connected Room Status Box (Visible once connected) -->
+                <div id="mp-live-status-box" class="mp-live-status-box hidden">
+                  <div class="mp-room-header-row">
+                    <div class="mp-room-tag">ROOM: <strong id="mp-current-room-tag">DESK-1</strong></div>
+                    <div class="mp-ping-pill">PING: <span id="mp-ping-readout">-- ms</span></div>
+                  </div>
+
+                  <div class="mp-roster-title">RACERS IN CIRCUIT (<span id="mp-roster-count">1</span>/8)</div>
+                  <div id="mp-roster-list" class="mp-roster-list">
+                    <!-- Dynamically populated racer items -->
+                  </div>
+
+                  <button id="btn-mp-start-race" class="welcome-start-btn mp-start-race-btn" type="button">
+                    <span class="welcome-start-text">START MULTIPLAYER RACE</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 1. Shop & Currency Store Dialog -->
+            <div id="shop-dialog-overlay" class="welcome-dialog-overlay hidden" role="dialog" aria-labelledby="shop-title">
+              <div class="welcome-dialog-card drawer-dialog-card">
+                <button id="btn-close-shop" class="dialog-close-btn" type="button" aria-label="Close">&times;</button>
+                <div class="welcome-eyebrow">IN-GAME CAR &amp; CURRENCY STORE</div>
+                <h2 id="shop-title" class="welcome-title">RACING SHOP</h2>
+
+                <div class="drawer-grid">
+                  <!-- Coin Packs -->
+                  <div class="drawer-card">
+                    <div class="drawer-card-header">
+                      <span class="drawer-icon">🪙</span>
+                      <div class="drawer-card-title">
+                        <h4>50,000 GOLD COINS</h4>
+                        <span class="drawer-sub">+5,000 BONUS COINS</span>
+                      </div>
+                    </div>
+                    <button class="shop-buy-btn" type="button" data-buy-type="coins" data-amount="50000">
+                      CLAIM 🪙 50,000
+                    </button>
+                  </div>
+
+                  <div class="drawer-card">
+                    <div class="drawer-card-header">
+                      <span class="drawer-icon">💰</span>
+                      <div class="drawer-card-title">
+                        <h4>250,000 MEGA VAULT</h4>
+                        <span class="drawer-sub">+50,000 EXTRA BONUS</span>
+                      </div>
+                    </div>
+                    <button class="shop-buy-btn" type="button" data-buy-type="coins" data-amount="250000">
+                      CLAIM 🪙 250,000
+                    </button>
+                  </div>
+
+                  <!-- Gem Packs -->
+                  <div class="drawer-card">
+                    <div class="drawer-card-header">
+                      <span class="drawer-icon">💎</span>
+                      <div class="drawer-card-title">
+                        <h4>1,000 NITRO GEMS</h4>
+                        <span class="drawer-sub">TURBO AFTERBURNERS</span>
+                      </div>
+                    </div>
+                    <button class="shop-buy-btn shop-buy-gems" type="button" data-buy-type="gems" data-amount="1000">
+                      CLAIM 💎 1,000
+                    </button>
+                  </div>
+
+                  <!-- Supercar Instant Unlocks -->
+                  <div class="drawer-card drawer-card-highlight">
+                    <div class="drawer-card-header">
+                      <span class="drawer-icon">🏁</span>
+                      <div class="drawer-card-title">
+                        <h4>SCUDERIA ROSSO F1</h4>
+                        <span class="drawer-sub">S-CLASS · PP 810 · FORMULA GP</span>
+                      </div>
+                    </div>
+                    <button class="shop-buy-btn shop-unlock-car" type="button" data-buy-type="car" data-car="scuderia" data-cost="50000">
+                      EQUIP F1 ROSSO
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Inventory & Profile Stats Dialog -->
+            <div id="inventory-dialog-overlay" class="welcome-dialog-overlay hidden" role="dialog" aria-labelledby="inv-title">
+              <div class="welcome-dialog-card drawer-dialog-card">
+                <button id="btn-close-inv" class="dialog-close-btn" type="button" aria-label="Close">&times;</button>
+                <div class="welcome-eyebrow">PLAYER PROFILE &amp; TROPHY CASE</div>
+                <h2 id="inv-title" class="welcome-title">INVENTORY &amp; STATS</h2>
+
+                <div class="profile-hero-block">
+                  <div class="profile-large-avatar">🔥</div>
+                  <div class="profile-meta-info">
+                    <h3 class="profile-name-large">DESK RACER PRO</h3>
+                    <div class="profile-rank-tag">LEVEL 12 SPEED DEMON · VIP PRO</div>
+                    <div class="profile-xp-row">
+                      <span>XP PROGRESS: 1,850 / 2,500</span>
+                      <div class="xp-bar-track"><div class="xp-bar-fill" style="width: 74%"></div></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="stats-grid-cards">
+                  <div class="stat-mini-card">
+                    <span class="stat-num">4 / 4</span>
+                    <span class="stat-lbl">STAGES CLEARED</span>
+                  </div>
+                  <div class="stat-mini-card">
+                    <span class="stat-num">18.4 km</span>
+                    <span class="stat-lbl">DRIFT DISTANCE</span>
+                  </div>
+                  <div class="stat-mini-card">
+                    <span class="stat-num">00:20.84</span>
+                    <span class="stat-lbl">BEST LAP TIME</span>
+                  </div>
+                  <div class="stat-mini-card">
+                    <span class="stat-num">🏆 12</span>
+                    <span class="stat-lbl">GOLD TROPHIES</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Game Settings Dialog -->
+            <div id="settings-dialog-overlay" class="welcome-dialog-overlay hidden" role="dialog" aria-labelledby="settings-title">
+              <div class="welcome-dialog-card drawer-dialog-card">
+                <button id="btn-close-settings" class="dialog-close-btn" type="button" aria-label="Close">&times;</button>
+                <div class="welcome-eyebrow">GAME CONFIGURATION &amp; PREFERENCES</div>
+                <h2 id="settings-title" class="welcome-title">SETTINGS</h2>
+
+                <div class="settings-options-list">
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-label">AUDIO SOUND FX &amp; ENGINE SYNTH</span>
+                      <span class="setting-sub">Toggle WebAudio engine sputter &amp; drift squeals</span>
+                    </div>
+                    <button id="btn-setting-toggle-sound" class="setting-toggle-btn active" type="button">ENABLED</button>
+                  </div>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-label">DEFAULT CAMERA VIEW</span>
+                      <span class="setting-sub">Set preferred view mode for race starts</span>
+                    </div>
+                    <div class="setting-pill-group">
+                      <button class="setting-pill-btn active" data-setting-cam="1" type="button">CHASE</button>
+                      <button class="setting-pill-btn" data-setting-cam="2" type="button">POV</button>
+                      <button class="setting-pill-btn" data-setting-cam="3" type="button">DESK</button>
+                      <button class="setting-pill-btn" data-setting-cam="4" type="button">DRONE</button>
+                    </div>
+                  </div>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-label">PHONE BEZEL SHELL</span>
+                      <span class="setting-sub">Toggle 16:9 phone frame bezel outline</span>
+                    </div>
+                    <button id="btn-setting-toggle-frame" class="setting-toggle-btn active" type="button">FRAME ON</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. Notifications Drawer Dialog -->
+            <div id="notifications-dialog-overlay" class="welcome-dialog-overlay hidden" role="dialog" aria-labelledby="notif-title">
+              <div class="welcome-dialog-card drawer-dialog-card">
+                <button id="btn-close-notif" class="dialog-close-btn" type="button" aria-label="Close">&times;</button>
+                <div class="welcome-eyebrow">RACER NOTIFICATIONS &amp; EVENTS</div>
+                <h2 id="notif-title" class="welcome-title">NOTIFICATIONS</h2>
+
+                <div class="notif-list">
+                  <div class="notif-card notif-unread">
+                    <span class="notif-badge">🎁 DAILY BONUS</span>
+                    <div class="notif-content">
+                      <h4>DAILY LOGIN BONUS READY</h4>
+                      <p>Claim your daily +5,000 Gold Coins bonus!</p>
+                      <button id="btn-claim-daily" class="notif-action-btn" type="button">CLAIM +5,000 🪙</button>
+                    </div>
+                  </div>
+
+                  <div class="notif-card">
+                    <span class="notif-badge">🌐 MULTIPLAYER</span>
+                    <div class="notif-content">
+                      <h4>TAK NITRO DOME LIVE ARENA</h4>
+                      <p>Online room matches are live on room DESK-1.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bluetooth & Wireless Controller Dialog -->
+            <div id="bluetooth-dialog-overlay" class="welcome-dialog-overlay hidden" role="dialog" aria-labelledby="bt-title">
+              <div class="welcome-dialog-card bt-dialog-card">
+                <button id="btn-close-bt" class="dialog-close-btn" type="button" aria-label="Close">&times;</button>
+                <div class="welcome-eyebrow">BLUETOOTH &amp; WIRELESS HARDWARE</div>
+                <h2 id="bt-title" class="welcome-title">BLUETOOTH RACING</h2>
+
+                <!-- Gamepad Status Card -->
+                <div class="bt-section-card">
+                  <div class="bt-section-header">
+                    <svg class="bt-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="2" y="6" width="20" height="12" rx="6"></rect>
+                      <path d="M6 12h4m-2-2v4m10-2h.01m-3-1h.01"></path>
+                    </svg>
+                    <div class="bt-section-info">
+                      <div class="bt-section-title">BLUETOOTH CONTROLLER</div>
+                      <div id="bt-gamepad-status-text" class="bt-status-sub">Searching for Bluetooth / USB gamepad...</div>
+                    </div>
+                  </div>
+
+                  <!-- Live Button Activity Bars -->
+                  <div class="bt-telemetry-cluster">
+                    <div class="bt-bar-row">
+                      <span class="bt-telemetry-label">STEER (LEFT STICK / D-PAD)</span>
+                      <div class="bt-steer-track">
+                        <div id="bt-steer-indicator" class="bt-steer-thumb"></div>
+                      </div>
+                    </div>
+                    <div class="bt-pedal-bars-row">
+                      <div class="bt-pedal-bar-wrap">
+                        <span class="bt-telemetry-label">GAS (RT / A)</span>
+                        <div class="bt-pedal-track">
+                          <div id="bt-gas-fill" class="bt-pedal-fill bt-gas-fill"></div>
+                        </div>
+                      </div>
+                      <div class="bt-pedal-bar-wrap">
+                        <span class="bt-telemetry-label">BRAKE (LT / B)</span>
+                        <div class="bt-pedal-track">
+                          <div id="bt-brake-fill" class="bt-pedal-fill bt-brake-fill"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="bt-button-row">
+                    <button id="btn-bt-rumble" class="mp-small-btn bt-rumble-btn" type="button">
+                      TEST DUAL RUMBLE HAPTICS
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Web Bluetooth BLE Sensors Card -->
+                <div class="bt-section-card">
+                  <div class="bt-section-header">
+                    <svg class="bt-icon-svg bt-blue-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+                    </svg>
+                    <div class="bt-section-info">
+                      <div class="bt-section-title">WEB BLUETOOTH BLE SENSORS</div>
+                      <div id="bt-ble-status-text" class="bt-status-sub">Pair BLE steering wheels, pedals, or micro:bit</div>
+                    </div>
+                  </div>
+                  <button id="btn-bt-scan-ble" class="welcome-start-btn bt-scan-btn" type="button">
+                    <span class="welcome-start-text">SCAN FOR BLE DEVICES</span>
+                  </button>
+                </div>
+
+                <!-- Fast Pairing Instructions -->
+                <div class="bt-guide-box">
+                  <div class="bt-guide-title">HOW TO CONNECT ON ANY DEVICE:</div>
+                  <ul class="bt-guide-list">
+                    <li><strong>iOS (iPhone / iPad):</strong> Settings &gt; Bluetooth &gt; Put controller in pairing mode &gt; Tap to Connect.</li>
+                    <li><strong>Android:</strong> Settings &gt; Connected Devices &gt; Pair new device &gt; Select Wireless Controller.</li>
+                    <li><strong>Mac / Windows:</strong> Bluetooth Settings &gt; Pair Xbox / PS5 DualSense / Switch Pro Controller.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- Center Formula 1 Countdown Number -->
+            <div id="hud-f1-countdown" class="hud-f1-countdown hidden">5</div>
+
+            <!-- Finish Overlay (Career Level Complete & Continue) -->
+            <div id="hud-finish-overlay" class="welcome-dialog-overlay hud-finish-overlay hidden" role="dialog" aria-labelledby="hud-finish-title">
+              <div class="welcome-dialog-card finish-dialog-card">
+                <div id="finish-level-eyebrow" class="welcome-eyebrow">LEVEL 1 COMPLETE · ★★★</div>
+                <h2 id="hud-finish-title" class="hud-finish-title">STAGE CLEAR!</h2>
+                <div id="hud-finish-time" class="hud-finish-time">00:00.00</div>
+                <div id="hud-finish-sub" class="hud-finish-sub">BEST LAP 00:00.00</div>
+
+                <div id="finish-unlock-banner" class="finish-unlock-banner">
+                  <span class="unlock-icon">🏆</span>
+                  <span id="finish-unlock-text">CAREER PROGRESS SAVED · NEXT LEVEL UNLOCKED</span>
+                </div>
+
+                <div class="finish-actions-row">
+                  <button id="btn-finish-continue-next" class="glass-cta-btn glass-btn-gold finish-action-btn" type="button">
+                    <span class="glass-cta-icon">⚡</span>
+                    <span class="glass-cta-text">CONTINUE TO NEXT LEVEL</span>
+                  </button>
+                  <button id="btn-finish-race-again" class="glass-pill-btn finish-action-btn" type="button">
+                    <span>🔄</span>
+                    <span class="welcome-start-text">RETRY LEVEL</span>
+                  </button>
+                  <button id="btn-finish-menu" class="glass-pill-btn finish-action-btn" type="button">
+                    <span>🏠</span>
+                    <span class="welcome-start-text">MAIN MENU</span>
+                  </button>
+                  <button id="btn-finish-autopilot" class="glass-pill-btn finish-action-btn finish-autopilot-btn" type="button">
+                    <span>⚡</span>
+                    <span class="welcome-start-text">AUTO-PILOT</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bottom Row: Integrated 16:9 Minimap (Left) & Speedometer (Right) -->
+            <footer class="hud-bottom-bar">
+              <!-- Left: Minimap Radar tucked gracefully above left steering thumb -->
+              <div class="hud-minimap-widget" title="Live Racetrack Position">
+                <canvas id="minimap-canvas" width="600" height="390"></canvas>
+              </div>
+
+              <!-- Right: Speedometer Gauge tucked gracefully above right pedals -->
+              <div class="hud-speedo-gauge">
+                <svg id="speedo-gauge-svg" viewBox="0 0 284 134" class="speedo-svg">
+                  <defs>
+                    <linearGradient id="speedoFrameStrokeGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+                      <stop offset="0%" stop-color="rgba(255, 255, 255, 0.35)" />
+                      <stop offset="45%" stop-color="rgba(160, 240, 255, 0.55)" />
+                      <stop offset="100%" stop-color="rgba(0, 232, 255, 0.92)" />
+                    </linearGradient>
+                    <filter id="speedoCyanGlow" x="-25%" y="-25%" width="150%" height="150%">
+                      <feGaussianBlur stdDeviation="2.4" result="blur" />
+                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                  </defs>
+
+                  <polygon
+                    id="speedo-bar-casing"
+                    points="15,108 62,34 268,6 276,22 73,50 28,118"
+                    class="speedo-bar-casing"
+                    stroke="url(#speedoFrameStrokeGrad)"
+                  />
+                  <g id="speedo-ticks-group"></g>
+                </svg>
+
+                <div class="speedo-readout-group">
+                  <div class="speedo-unit-label">KM/H</div>
+                  <div id="hud-scale-speed" class="speedo-digits">0</div>
+                </div>
+              </div>
+            </footer>
+
+            <!-- On-Screen Mobile Driving Touch Controls (Permanent 16:9 Mobile App Controls) -->
+            <div
+              id="mobile-touch-controls"
+              class="mobile-touch-controls"
+              role="region"
+              aria-label="Mobile Driving Controls"
+            >
+              <!-- Left Thumb Zone: Steering (Left / Right) -->
+              <div class="mobile-ctrl-cluster mobile-steer-cluster" role="group" aria-label="Steering Controls">
+                <button
+                  id="btn-touch-left"
+                  class="mobile-ctrl-btn mobile-ctrl-steer"
+                  type="button"
+                  data-control="left"
+                  aria-label="Steer Left (A)"
+                  title="Steer Left (A)"
+                >
+                  <span class="mobile-ctrl-inner">
+                    <svg class="mobile-ctrl-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <polyline points="13 17 8 12 13 7"></polyline>
+                      <polyline points="18 17 13 12 18 7" opacity="0.45"></polyline>
+                    </svg>
+                    <span class="mobile-ctrl-label">STEER L</span>
+                  </span>
+                </button>
+
+                <button
+                  id="btn-touch-right"
+                  class="mobile-ctrl-btn mobile-ctrl-steer"
+                  type="button"
+                  data-control="right"
+                  aria-label="Steer Right (D)"
+                  title="Steer Right (D)"
+                >
+                  <span class="mobile-ctrl-inner">
+                    <svg class="mobile-ctrl-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <polyline points="11 17 16 12 11 7"></polyline>
+                      <polyline points="6 17 11 12 6 7" opacity="0.45"></polyline>
+                    </svg>
+                    <span class="mobile-ctrl-label">STEER R</span>
+                  </span>
+                </button>
+              </div>
+
+              <!-- Right Thumb Zone: Pedals (Accelerate / Brake) -->
+              <div class="mobile-ctrl-cluster mobile-pedal-cluster" role="group" aria-label="Accelerate and Brake Controls">
+                <button
+                  id="btn-touch-accel"
+                  class="mobile-ctrl-btn mobile-ctrl-accel"
+                  type="button"
+                  data-control="forward"
+                  aria-label="Accelerate (W)"
+                  title="Accelerate (W)"
+                >
+                  <span class="mobile-ctrl-inner">
+                    <svg class="mobile-ctrl-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <polyline points="17 13 12 8 7 13"></polyline>
+                      <polyline points="17 18 12 13 7 18" opacity="0.45"></polyline>
+                    </svg>
+                    <span class="mobile-ctrl-label">GAS</span>
+                  </span>
+                </button>
+
+                <button
+                  id="btn-touch-brake"
+                  class="mobile-ctrl-btn mobile-ctrl-brake"
+                  type="button"
+                  data-control="backward"
+                  aria-label="Brake (S)"
+                  title="Brake (S)"
+                >
+                  <span class="mobile-ctrl-inner">
+                    <svg class="mobile-ctrl-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <polyline points="7 8 12 13 17 8"></polyline>
+                      <line x1="7" y1="17" x2="17" y2="17"></line>
+                    </svg>
+                    <span class="mobile-ctrl-label">BRAKE</span>
+                  </span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      </footer>
-
-      <!-- Mobile Bottom Touch Controls Row (Visible in Mobile View after clicking Start Time Trial) -->
-      <div
-        id="mobile-touch-controls"
-        class="mobile-touch-controls hidden"
-        role="region"
-        aria-label="Mobile Driving Controls"
-      >
-        <!-- Left Side: Left (A) and Right (D) Steer Icons -->
-        <div class="mobile-ctrl-cluster mobile-steer-cluster" role="group" aria-label="Steering Controls">
-          <button
-            id="btn-touch-left"
-            class="mobile-ctrl-btn mobile-ctrl-steer"
-            type="button"
-            data-control="left"
-            aria-label="Steer Left (A)"
-            title="Steer Left (A)"
-          >
-            <span class="mobile-ctrl-inner">
-              <svg class="mobile-ctrl-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="13 17 8 12 13 7"></polyline>
-                <polyline points="18 17 13 12 18 7" opacity="0.45"></polyline>
-              </svg>
-              <span class="mobile-ctrl-label">LEFT</span>
-            </span>
-          </button>
-
-          <button
-            id="btn-touch-right"
-            class="mobile-ctrl-btn mobile-ctrl-steer"
-            type="button"
-            data-control="right"
-            aria-label="Steer Right (D)"
-            title="Steer Right (D)"
-          >
-            <span class="mobile-ctrl-inner">
-              <svg class="mobile-ctrl-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="11 17 16 12 11 7"></polyline>
-                <polyline points="6 17 11 12 6 7" opacity="0.45"></polyline>
-              </svg>
-              <span class="mobile-ctrl-label">RIGHT</span>
-            </span>
-          </button>
-        </div>
-
-        <!-- Right Side: Accelerate (W) and Brake (S) Icons -->
-        <div class="mobile-ctrl-cluster mobile-pedal-cluster" role="group" aria-label="Accelerate and Brake Controls">
-          <button
-            id="btn-touch-accel"
-            class="mobile-ctrl-btn mobile-ctrl-accel"
-            type="button"
-            data-control="forward"
-            aria-label="Accelerate (W)"
-            title="Accelerate (W)"
-          >
-            <span class="mobile-ctrl-inner">
-              <svg class="mobile-ctrl-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="17 13 12 8 7 13"></polyline>
-                <polyline points="17 18 12 13 7 18" opacity="0.45"></polyline>
-              </svg>
-              <span class="mobile-ctrl-label">ACCEL</span>
-            </span>
-          </button>
-
-          <button
-            id="btn-touch-brake"
-            class="mobile-ctrl-btn mobile-ctrl-brake"
-            type="button"
-            data-control="backward"
-            aria-label="Brake (S)"
-            title="Brake (S)"
-          >
-            <span class="mobile-ctrl-inner">
-              <svg class="mobile-ctrl-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="7 8 12 13 17 8"></polyline>
-                <line x1="7" y1="17" x2="17" y2="17"></line>
-              </svg>
-              <span class="mobile-ctrl-label">BRAKE</span>
-            </span>
-          </button>
-        </div>
-      </div>
+      </main>
     </div>
 
     <script type="module" src="/src/main.js"></script>

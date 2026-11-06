@@ -17,9 +17,23 @@ import { buildGoldenHourAtmosphere } from './scene/GoldenHourAtmosphere.js';
 import { buildRoomEnvironment } from './scene/RoomEnvironmentBuilder.js';
 import { createKartPhysicsController } from './physics/KartPhysicsController.js';
 import { createWebAudioSynth } from './audio/WebAudioSynth.js';
+import { BluetoothManager } from './bluetooth/BluetoothManager.js';
+import { MultiplayerClient } from './multiplayer/MultiplayerClient.js';
+import { GameCustomizer, LEVELS } from './game/GameCustomizer.js';
+import { EndlessModeManager } from './game/EndlessModeManager.js';
 
 async function initApp() {
   const container = document.getElementById('canvas-container');
+
+  function getViewportSize() {
+    const rect = container ? container.getBoundingClientRect() : null;
+    let w = rect && rect.width > 0 ? Math.floor(rect.width) : window.innerWidth;
+    let h = rect && rect.height > 0 ? Math.floor(rect.height) : window.innerHeight;
+    if (w <= 0) w = window.innerWidth;
+    if (h <= 0) h = window.innerHeight;
+    return { w, h, aspect: w / h };
+  }
+  const initialVp = getViewportSize();
 
   // -------------------------------------------------------------------------
   // 1. THREE.JS SCENE, RENDERER & ACES FILMIC + UNREAL BLOOM POST-PROCESSING
@@ -30,7 +44,7 @@ async function initApp() {
 
   const camera = new THREE.PerspectiveCamera(
     54,
-    window.innerWidth / window.innerHeight,
+    initialVp.aspect,
     0.002, // 2mm near plane for 1:87 HO micro-scale closeups!
     12.0
   );
@@ -39,7 +53,7 @@ async function initApp() {
     antialias: true,
     powerPreference: 'high-performance',
   });
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(initialVp.w, initialVp.h);
   const urlParams = new URLSearchParams(window.location.search);
   const isScreenshotUrl = urlParams.get('screenshot') === '1';
   const isScreenshotMode = isScreenshotUrl;
@@ -803,6 +817,18 @@ async function initApp() {
     coaster.roadGeo
   );
 
+  // Initialize Game Customizer, Offline Endless Mode, Bluetooth Gamepad & Online Multiplayer
+  const customizer = new GameCustomizer();
+  const endlessManager = new EndlessModeManager();
+  const bluetooth = new BluetoothManager();
+  const multiplayer = new MultiplayerClient(scene);
+
+  customizer.initUI();
+  customizer.applyToKart(microKart);
+  customizer.applyToEnvironment(scene, diorama, coaster, atmosphere, roomEnv);
+  bluetooth.initUI();
+  multiplayer.initUI();
+
   let camShakeTimer = 0.0;
   let camShakeIntensity = 0.0;
 
@@ -813,6 +839,10 @@ async function initApp() {
       }
       camShakeTimer = 0.18;
       camShakeIntensity = THREE.MathUtils.clamp(severity, 0.35, 1.0);
+      bluetooth.rumble(0.6 * severity, 140);
+      if (customizer.selectedMode === 'endless') {
+        endlessManager.onImpact(severity);
+      }
     });
   }
 
@@ -1887,6 +1917,25 @@ async function initApp() {
     radarCtx.arc(kx, ky, 4.8, 0, Math.PI * 2);
     radarCtx.fill();
     radarCtx.restore();
+
+    // Draw online multiplayer opponents on the 3D minimap radar
+    const opponents = multiplayer.getOpponentsData();
+    if (opponents && opponents.length > 0) {
+      for (const opp of opponents) {
+        if (!opp.position) continue;
+        const ox = mapMinimapX(opp.position.x, opp.position.y, opp.position.z);
+        const oy = mapMinimapY(opp.position.x, opp.position.y, opp.position.z);
+        radarCtx.save();
+        radarCtx.fillStyle = opp.color || '#ff8800';
+        radarCtx.beginPath();
+        radarCtx.arc(ox, oy, 7.0, 0, Math.PI * 2);
+        radarCtx.fill();
+        radarCtx.strokeStyle = '#ffffff';
+        radarCtx.lineWidth = 1.8;
+        radarCtx.stroke();
+        radarCtx.restore();
+      }
+    }
   }
 
   // Cache HUD DOM elements
@@ -1952,7 +2001,7 @@ async function initApp() {
     }
   }
 
-  function showFinishOverlay(totalTime, bestLap, playAudio = true) {
+  function showFinishOverlay(totalTime, bestLap, playAudio = true, isEndlessGameOver = false) {
     hideLapSplit();
     if (elFinishTime) {
       elFinishTime.textContent = formatLapTimerMMSSCC(totalTime);
@@ -1961,6 +2010,29 @@ async function initApp() {
       const bestVal = bestLap != null ? bestLap : (totalTime || 0) / 3;
       elFinishSub.textContent = `BEST LAP ${formatLapTimerMMSSCC(bestVal)}`;
     }
+
+    const elFinishEyebrow = document.getElementById('finish-level-eyebrow');
+    const elFinishTitle = document.getElementById('hud-finish-title');
+    const elFinishUnlockText = document.getElementById('finish-unlock-text');
+    const curLvl = customizer.getLevelData();
+
+    if (isEndlessGameOver) {
+      if (elFinishEyebrow) elFinishEyebrow.textContent = 'ENDLESS SURVIVAL · GAME OVER';
+      if (elFinishTitle) elFinishTitle.textContent = 'TIME EXPIRED';
+      if (elFinishUnlockText) elFinishUnlockText.textContent = 'SURVIVAL RUN SAVED TO LEADERBOARD';
+    } else {
+      customizer.unlockNextCareerLevel(customizer.selectedLevel);
+      if (elFinishEyebrow) elFinishEyebrow.textContent = `${curLvl.name.toUpperCase()} COMPLETE · ★★★`;
+      if (elFinishTitle) elFinishTitle.textContent = 'STAGE CLEAR!';
+      if (elFinishUnlockText) {
+        const nextLvlNum = typeof curLvl.levelNum === 'number' ? curLvl.levelNum + 1 : 1;
+        const nextLvl = LEVELS.find((l) => l.levelNum === nextLvlNum);
+        elFinishUnlockText.textContent = nextLvl
+          ? `UNLOCKED: ${nextLvl.name.toUpperCase()} (LEVEL ${nextLvlNum})`
+          : 'CHAMPIONSHIP COMPLETED! ALL LEVELS UNLOCKED';
+      }
+    }
+
     if (elFinishOverlay) {
       elFinishOverlay.classList.remove('hidden');
     }
@@ -1977,11 +2049,19 @@ async function initApp() {
     finishOverlayShown = true;
   }
 
+  // Hook Endless Mode Game Over
+  endlessManager.onGameOver((scoreData) => {
+    showFinishOverlay(scoreData.totalTime, scoreData.bestLap, true, true);
+  });
+
   physics.onLapComplete((lapTime, bestLap, completedLapNum, totalTime, isFinish) => {
+    if (customizer.selectedMode === 'endless') {
+      endlessManager.onLapCompleted(lapTime);
+    }
     if (isFinish) {
       const finalTotal =
         totalTime ?? physics.state.finishTotalTime ?? physics.state.totalRaceTime ?? lapTime;
-      showFinishOverlay(finalTotal, bestLap ?? lapTime, true);
+      showFinishOverlay(finalTotal, bestLap ?? lapTime, true, false);
     } else {
       audioSynth.playLapChime();
       const lapNum = completedLapNum || Math.max(1, (physics.state.lapCount || 2) - 1);
@@ -2321,6 +2401,8 @@ async function initApp() {
   syncMobileTouchControlsVisibility();
 
   function showWelcomeDialog() {
+    const mainMenuHud = document.getElementById('main-menu-hud-root');
+    if (mainMenuHud) mainMenuHud.classList.remove('hidden');
     if (elWelcomeOverlay) {
       elWelcomeOverlay.classList.remove('hidden');
       focusWelcomeStartButton();
@@ -2329,6 +2411,8 @@ async function initApp() {
   }
 
   function hideWelcomeDialog() {
+    const mainMenuHud = document.getElementById('main-menu-hud-root');
+    if (mainMenuHud) mainMenuHud.classList.add('hidden');
     if (elWelcomeOverlay && !elWelcomeOverlay.classList.contains('hidden')) {
       elWelcomeOverlay.classList.add('hidden');
     }
@@ -2379,6 +2463,322 @@ async function initApp() {
         dismissWelcomeAndStartRace();
         btnWelcomeStart.blur();
       }
+    });
+  }
+
+  function startRaceWithSettings(_opts = {}) {
+    const isEndless = customizer.selectedMode === 'endless';
+    const hudEndless = document.getElementById('hud-endless-widget');
+    const hudLap = document.getElementById('hud-lap-widget');
+    if (hudEndless && hudLap) {
+      hudEndless.classList.toggle('hidden', !isEndless);
+      hudLap.classList.toggle('hidden', isEndless);
+    }
+    if (isEndless) {
+      endlessManager.reset();
+    }
+    customizer.applyToKart(microKart);
+    customizer.applyToEnvironment(scene, diorama, coaster, atmosphere, roomEnv);
+    dismissWelcomeAndStartRace();
+  }
+
+  customizer.onStartRace((cfg) => {
+    startRaceWithSettings(cfg);
+  });
+
+  customizer.onSelectionChanged((cat) => {
+    if (cat === 'character' || cat === 'car') {
+      customizer.applyToKart(microKart);
+      if (multiplayer && multiplayer.connected) {
+        const char = customizer.getCharacterData();
+        const car = customizer.getCarData();
+        multiplayer.sendProfile({
+          character: char.name,
+          car: car.name,
+          color: car.primaryColor,
+        });
+      }
+    } else if (cat === 'level') {
+      customizer.applyToEnvironment(scene, diorama, coaster, atmosphere, roomEnv);
+    }
+  });
+
+  // Finish Dialog Career Action: Continue to Next Level
+  const btnFinishContinueNext = document.getElementById('btn-finish-continue-next');
+  if (btnFinishContinueNext) {
+    btnFinishContinueNext.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const curLvl = customizer.getLevelData();
+      const nextLvlNum = typeof curLvl.levelNum === 'number' ? curLvl.levelNum + 1 : 1;
+      const targetLvl = LEVELS.find((l) => l.levelNum === nextLvlNum) || LEVELS[0];
+      customizer.setLevel(targetLvl.id);
+      startRaceWithSettings();
+      btnFinishContinueNext.blur();
+    });
+  }
+
+  // Finish Dialog: Main Menu
+  const btnFinishMenu = document.getElementById('btn-finish-menu');
+  if (btnFinishMenu) {
+    btnFinishMenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+      hideFinishOverlay();
+      showWelcomeDialog();
+      btnFinishMenu.blur();
+    });
+  }
+
+  // Garage Dialog & Tabs
+  const garageOverlay = document.getElementById('garage-dialog-overlay');
+  const btnOpenGarage = document.getElementById('btn-open-garage');
+  const btnCloseGarage = document.getElementById('btn-close-garage');
+  const btnApplyGarage = document.getElementById('btn-apply-garage');
+  const btnMenuGarage = document.getElementById('btn-menu-garage');
+
+  const openGarage = () => { if (garageOverlay) garageOverlay.classList.remove('hidden'); };
+  const closeGarage = () => {
+    if (garageOverlay) garageOverlay.classList.add('hidden');
+    customizer.applyToKart(microKart);
+    customizer.applyToEnvironment(scene, diorama, coaster, atmosphere, roomEnv);
+    customizer.updateShowcaseMenuUI();
+  };
+
+  if (btnOpenGarage) btnOpenGarage.addEventListener('click', openGarage);
+  if (btnMenuGarage) btnMenuGarage.addEventListener('click', openGarage);
+  if (btnCloseGarage) btnCloseGarage.addEventListener('click', closeGarage);
+  if (btnApplyGarage) btnApplyGarage.addEventListener('click', closeGarage);
+
+  document.querySelectorAll('.garage-tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.garage-tab-btn').forEach((b) => b.classList.remove('active'));
+      document.querySelectorAll('.garage-tab-pane').forEach((p) => p.classList.remove('active'));
+      btn.classList.add('active');
+      const tabPane = document.getElementById(`tab-pane-${btn.dataset.tab}`);
+      if (tabPane) tabPane.classList.add('active');
+    });
+  });
+
+  // Multiplayer Dialog
+  const mpOverlay = document.getElementById('multiplayer-dialog-overlay');
+  const btnOpenMp = document.getElementById('btn-open-multiplayer');
+  const btnCloseMp = document.getElementById('btn-close-mp');
+  const btnMenuMp = document.getElementById('btn-menu-multiplayer');
+  const openMp = () => { if (mpOverlay) mpOverlay.classList.remove('hidden'); };
+  const closeMp = () => { if (mpOverlay) mpOverlay.classList.add('hidden'); };
+  if (btnOpenMp) btnOpenMp.addEventListener('click', openMp);
+  if (btnMenuMp) btnMenuMp.addEventListener('click', openMp);
+  if (btnCloseMp) btnCloseMp.addEventListener('click', closeMp);
+
+  // Bluetooth Dialog
+  const btOverlay = document.getElementById('bluetooth-dialog-overlay');
+  const btnOpenBt = document.getElementById('btn-open-bluetooth');
+  const btnCloseBt = document.getElementById('btn-close-bt');
+  const btnMenuBt = document.getElementById('btn-menu-bluetooth');
+  const openBt = () => { if (btOverlay) btOverlay.classList.remove('hidden'); };
+  const closeBt = () => { if (btOverlay) btOverlay.classList.add('hidden'); };
+  if (btnOpenBt) btnOpenBt.addEventListener('click', openBt);
+  if (btnMenuBt) btnMenuBt.addEventListener('click', openBt);
+  if (btnCloseBt) btnCloseBt.addEventListener('click', closeBt);
+
+  // -------------------------------------------------------------------------
+  // PREMIUM 3D MAIN MENU HUD CONTROLS & DRAWERS
+  // -------------------------------------------------------------------------
+  // Car Carousel Navigation Arrows
+  const btnCarPrev = document.getElementById('btn-car-prev');
+  const btnCarNext = document.getElementById('btn-car-next');
+  if (btnCarPrev) {
+    btnCarPrev.addEventListener('click', (e) => {
+      e.stopPropagation();
+      customizer.prevCar();
+      customizer.applyToKart(microKart);
+      customizer.updateShowcaseMenuUI();
+    });
+  }
+  if (btnCarNext) {
+    btnCarNext.addEventListener('click', (e) => {
+      e.stopPropagation();
+      customizer.nextCar();
+      customizer.applyToKart(microKart);
+      customizer.updateShowcaseMenuUI();
+    });
+  }
+
+  // Primary Play Button
+  const btnMenuPlay = document.getElementById('btn-menu-play');
+  if (btnMenuPlay) {
+    btnMenuPlay.addEventListener('click', (e) => {
+      e.stopPropagation();
+      startRaceWithSettings();
+    });
+  }
+
+  // Shop, Settings, Notifications & Inventory Dialog Overlays
+  const shopOverlay = document.getElementById('shop-dialog-overlay');
+  const settingsOverlay = document.getElementById('settings-dialog-overlay');
+  const notificationsOverlay = document.getElementById('notifications-dialog-overlay');
+  const inventoryOverlay = document.getElementById('inventory-dialog-overlay');
+
+  const openShop = () => { if (shopOverlay) shopOverlay.classList.remove('hidden'); };
+  const closeShop = () => { if (shopOverlay) shopOverlay.classList.add('hidden'); };
+  const openSettings = () => { if (settingsOverlay) settingsOverlay.classList.remove('hidden'); };
+  const closeSettings = () => { if (settingsOverlay) settingsOverlay.classList.add('hidden'); };
+  const openNotifications = () => { if (notificationsOverlay) notificationsOverlay.classList.remove('hidden'); };
+  const closeNotifications = () => { if (notificationsOverlay) notificationsOverlay.classList.add('hidden'); };
+  const openInventory = () => { if (inventoryOverlay) inventoryOverlay.classList.remove('hidden'); };
+  const closeInventory = () => { if (inventoryOverlay) inventoryOverlay.classList.add('hidden'); };
+
+  const btnOpenShopCoins = document.getElementById('btn-open-shop-coins');
+  const btnOpenShopGems = document.getElementById('btn-open-shop-gems');
+  const btnCloseShop = document.getElementById('btn-close-shop');
+  if (btnOpenShopCoins) btnOpenShopCoins.addEventListener('click', openShop);
+  if (btnOpenShopGems) btnOpenShopGems.addEventListener('click', openShop);
+  if (btnCloseShop) btnCloseShop.addEventListener('click', closeShop);
+
+  const btnOpenSettings = document.getElementById('btn-open-settings');
+  const btnCloseSettings = document.getElementById('btn-close-settings');
+  if (btnOpenSettings) btnOpenSettings.addEventListener('click', openSettings);
+  if (btnCloseSettings) btnCloseSettings.addEventListener('click', closeSettings);
+
+  const btnMenuNotifications = document.getElementById('btn-menu-notifications');
+  const btnCloseNotifications = document.getElementById('btn-close-notifications');
+  if (btnMenuNotifications) btnMenuNotifications.addEventListener('click', openNotifications);
+  if (btnCloseNotifications) btnCloseNotifications.addEventListener('click', closeNotifications);
+
+  const btnOpenProfile = document.getElementById('btn-open-profile');
+  const btnCloseInventory = document.getElementById('btn-close-inventory');
+  if (btnOpenProfile) btnOpenProfile.addEventListener('click', openInventory);
+  if (btnCloseInventory) btnCloseInventory.addEventListener('click', closeInventory);
+
+  // Bottom Navigation Bar Tabs
+  const bottomNavTabs = document.querySelectorAll('.menu-bottom-nav .menu-tab-btn');
+  bottomNavTabs.forEach((tab) => {
+    tab.addEventListener('click', (e) => {
+      e.stopPropagation();
+      bottomNavTabs.forEach((t) => t.classList.remove('active-tab'));
+      tab.classList.add('active-tab');
+      const tabName = tab.dataset.tab;
+      if (tabName === 'home') {
+        if (shopOverlay) shopOverlay.classList.add('hidden');
+        if (settingsOverlay) settingsOverlay.classList.add('hidden');
+        if (notificationsOverlay) notificationsOverlay.classList.add('hidden');
+        if (inventoryOverlay) inventoryOverlay.classList.add('hidden');
+        if (garageOverlay) garageOverlay.classList.add('hidden');
+      } else if (tabName === 'garage') {
+        openGarage();
+      } else if (tabName === 'career') {
+        startRaceWithSettings();
+      } else if (tabName === 'multiplayer') {
+        openMp();
+      } else if (tabName === 'shop') {
+        openShop();
+      } else if (tabName === 'profile') {
+        openInventory();
+      }
+    });
+  });
+
+  // Shop Pack Purchasing
+  document.querySelectorAll('.shop-buy-btn').forEach((buyBtn) => {
+    buyBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const coinsVal = parseInt(buyBtn.dataset.coins, 10);
+      const gemsVal = parseInt(buyBtn.dataset.gems, 10);
+      if (!isNaN(coinsVal) && coinsVal > 0) {
+        customizer.addCoins(coinsVal);
+      }
+      if (!isNaN(gemsVal) && gemsVal > 0) {
+        customizer.addGems(gemsVal);
+      }
+      buyBtn.textContent = 'PURCHASED!';
+      setTimeout(() => { buyBtn.textContent = buyBtn.dataset.coins ? `BUY · $${(coinsVal / 1000).toFixed(2)}` : `GET · ${gemsVal} GEMS`; }, 1200);
+    });
+  });
+
+  // Drag-to-Rotate 3D Vehicle Inspection in Showcase Mode
+  const centerpieceEl = document.querySelector('.menu-car-centerpiece');
+  if (centerpieceEl) {
+    let isDragging = false;
+    let previousX = 0;
+    centerpieceEl.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button') || e.target.closest('.car-info-glass-panel')) return;
+      isDragging = true;
+      previousX = e.clientX;
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (!isDragging || !microKart || !microKart.kartRoot) return;
+      const deltaX = e.clientX - previousX;
+      previousX = e.clientX;
+      microKart.kartRoot.rotation.y += deltaX * 0.012;
+    });
+    window.addEventListener('pointerup', () => { isDragging = false; });
+  }
+
+  // Quick Action Pills
+
+  const btnCloseFullscreenMenu = document.getElementById('btn-close-fullscreen-menu');
+  if (btnCloseFullscreenMenu) btnCloseFullscreenMenu.addEventListener('click', hideWelcomeDialog);
+
+  const btnQuickCam = document.getElementById('btn-quick-cam');
+  const txtQuickCam = document.getElementById('txt-quick-cam');
+  const camNames = { 1: 'CHASE', 2: 'COCKPIT', 3: 'DESK', 4: 'DRONE' };
+  if (btnQuickCam) {
+    btnQuickCam.addEventListener('click', () => {
+      const nextCam = (activeCameraMode % 4) + 1;
+      setCameraMode(nextCam);
+      if (txtQuickCam) txtQuickCam.textContent = camNames[nextCam] || 'CAM';
+    });
+  }
+
+  const btnQuickAutopilot = document.getElementById('btn-quick-autopilot');
+  const txtQuickAutopilot = document.getElementById('txt-quick-autopilot');
+  const toggleCruise = () => {
+    const nextAuto = !physics.state.autopilot;
+    physics.setAutopilot(nextAuto);
+    if (txtQuickAutopilot) txtQuickAutopilot.textContent = nextAuto ? 'CRUISE: ON' : 'CRUISE: OFF';
+    if (btnQuickAutopilot) btnQuickAutopilot.classList.toggle('active', nextAuto);
+  };
+  if (btnQuickAutopilot) btnQuickAutopilot.addEventListener('click', toggleCruise);
+  const btnMenuCruise = document.getElementById('btn-menu-autopilot');
+  if (btnMenuCruise) {
+    btnMenuCruise.addEventListener('click', () => {
+      toggleCruise();
+      hideWelcomeDialog();
+    });
+  }
+
+  // Bluetooth Controller Button Mappings
+  bluetooth.onButtonDown((action) => {
+    if (action === 'start') {
+      if (elWelcomeOverlay && !elWelcomeOverlay.classList.contains('hidden')) {
+        dismissWelcomeAndStartRace();
+      }
+    } else if (action === 'cam') {
+      const nextCam = (activeCameraMode % 4) + 1;
+      setCameraMode(nextCam);
+    } else if (action === 'autopilot') {
+      toggleCruise();
+    } else if (action === 'restart') {
+      physics.teleportToSector(1);
+    }
+  });
+
+  // Phone Frame Toggle
+  const btnToggleFrame = document.getElementById('btn-toggle-frame');
+  const mobileAppRoot = document.getElementById('mobile-app-root');
+  if (btnToggleFrame && mobileAppRoot) {
+    btnToggleFrame.addEventListener('click', () => {
+      const isHidden = mobileAppRoot.classList.toggle('hide-device-bezel');
+      btnToggleFrame.classList.toggle('active', !isHidden);
+      handleResize();
+    });
+  }
+
+  // Rotate Nudge Dismiss
+  const btnDismissRotate = document.getElementById('btn-dismiss-rotate');
+  const mobileRotateNudge = document.getElementById('mobile-rotate-nudge');
+  if (btnDismissRotate && mobileRotateNudge) {
+    btnDismissRotate.addEventListener('click', () => {
+      mobileRotateNudge.style.display = 'none';
     });
   }
 
@@ -2611,19 +3011,26 @@ async function initApp() {
   // -------------------------------------------------------------------------
   // 7. WINDOW RESIZE & 60FPS ANIMATION LOOP
   // -------------------------------------------------------------------------
-  window.addEventListener('resize', () => {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    camera.aspect = w / h;
+  function handleResize() {
+    const vp = getViewportSize();
+    camera.aspect = vp.aspect;
     camera.updateProjectionMatrix();
-    renderer.setSize(w, h);
-    composer.setSize(w, h);
+    renderer.setSize(vp.w, vp.h);
+    composer.setSize(vp.w, vp.h);
     const newDrawSize = renderer.getDrawingBufferSize(new THREE.Vector2());
-    fxaaPass.material.uniforms['resolution'].value.set(
-      1.0 / newDrawSize.x,
-      1.0 / newDrawSize.y
-    );
-  });
+    if (fxaaPass && fxaaPass.material && fxaaPass.material.uniforms['resolution']) {
+      fxaaPass.material.uniforms['resolution'].value.set(
+        1.0 / newDrawSize.x,
+        1.0 / newDrawSize.y
+      );
+    }
+  }
+
+  window.addEventListener('resize', handleResize);
+  const resizeObserver = new ResizeObserver(handleResize);
+  if (container) resizeObserver.observe(container);
+  const mobileViewportEl = document.getElementById('mobile-screen-viewport');
+  if (mobileViewportEl) resizeObserver.observe(mobileViewportEl);
 
   const clock = new THREE.Clock();
   let currentFocusDistance = activeCameraMode === 7 ? 1.85 : activeCameraMode === 8 ? 0.42 : 0.12;
@@ -2692,11 +3099,24 @@ async function initApp() {
       (isScreenshotMode ? screenshotFrameCounter / 60 : clock.getElapsedTime()) +
       requestedTimeOffset;
 
-    // 0. Step Formula 1 5-Light Start Countdown if active
+    // 0. Poll Bluetooth Gamepad (Wireless Controller / Steering Wheel)
+    const pad = bluetooth.poll();
+    if (pad.connected) {
+      physics.setGamepadInput(pad.steer, pad.throttle, pad.brake, pad.drift);
+    }
+
+    // 0b. Step Formula 1 5-Light Start Countdown if active
     stepF1StartCountdown(isScreenshotMode ? 0.0 : dt);
 
     // 1. Step 60FPS Rapier3D + Banked Coaster Spline Physics
     const st = physics.stepPhysics(dt);
+
+    // 1b. Step Realtime Multiplayer and Offline Endless Mode
+    multiplayer.update(dt);
+    multiplayer.sendTelemetry(st);
+    if (customizer.selectedMode === 'endless') {
+      endlessManager.update(dt, st);
+    }
 
     // 2. Sync 1:87 Micro-Kart Transform, Wheels, Helmeted Driver & Drift Sparks
     microKart.kartRoot.position.copy(st.position);

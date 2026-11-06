@@ -257,6 +257,22 @@ export async function createKartPhysicsController(splineData, manifest, roadGeo)
     left: false,
     right: false,
   };
+  const gamepadInput = {
+    steer: 0,
+    throttle: 0,
+    brake: 0,
+    drift: false,
+  };
+
+  function setGamepadInput(steer = 0, throttle = 0, brake = 0, drift = false) {
+    gamepadInput.steer = THREE.MathUtils.clamp(steer, -1.0, 1.0);
+    gamepadInput.throttle = THREE.MathUtils.clamp(throttle, 0.0, 1.0);
+    gamepadInput.brake = THREE.MathUtils.clamp(brake, 0.0, 1.0);
+    gamepadInput.drift = Boolean(drift);
+    if ((gamepadInput.throttle > 0.08 || gamepadInput.brake > 0.08 || Math.abs(gamepadInput.steer) > 0.08) && state.autopilot) {
+      setAutopilot(false);
+    }
+  }
   const kbKeys = {
     forward: false,
     backward: false,
@@ -643,6 +659,14 @@ export async function createKartPhysicsController(splineData, manifest, roadGeo)
       if (keys.forward) throttle += 1.0;
       if (keys.backward) throttle -= 1.0;
       turnRight = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+
+      // Bluetooth / Wireless Gamepad analog input
+      if (gamepadInput.throttle > 0.02) throttle += gamepadInput.throttle;
+      if (gamepadInput.brake > 0.02) throttle -= gamepadInput.brake;
+      if (Math.abs(gamepadInput.steer) > 0.02) {
+        turnRight = THREE.MathUtils.clamp(turnRight + gamepadInput.steer, -1.0, 1.0);
+      }
+      throttle = THREE.MathUtils.clamp(throttle, -1.0, 1.0);
     }
 
     if (state.boostActive > 0) {
@@ -1120,6 +1144,7 @@ export async function createKartPhysicsController(splineData, manifest, roadGeo)
     setAutopilot,
     setTouchKey,
     clearTouchKeys,
+    setGamepadInput,
     notifyLightsOut,
     onLapComplete: (cb) => {
       onLapCompleteCallback = cb;
